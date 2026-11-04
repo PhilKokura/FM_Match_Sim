@@ -108,6 +108,35 @@ areas the old search did not cover, **not** whether a valid GAME_MATCH object is
 currently allocated. If the memory layout does not explain the null result,
 investigate the native object's actual lifetime and vtable before scanning again.
 
+### Targeted candidate snapshots during a paused match
+
+After the complete readable-private scan found seven matching vtable-pointer
+candidates, use the scanner's saved JSON to capture only those exact addresses.
+The candidate vtable is rechecked first, then **at most five small reads** are
+performed per still-matching object at documented *tentative* offsets.
+
+Pause FM27, then:
+
+```powershell
+fm-match-sim snapshot-matches --from-scan "match-objects-remainder.json" --dll "D:\Steam\steamapps\common\Football Manager 27\fm_Data\Plugins\x86_64\game_plugin.dll" --out "match-snapshot-1.json"
+```
+
+Resume FM27 for around five to ten **in-game** minutes, pause again, then
+capture the second snapshot:
+
+```powershell
+fm-match-sim snapshot-matches --from-scan "match-objects-remainder.json" --dll "D:\Steam\steamapps\common\Football Manager 27\fm_Data\Plugins\x86_64\game_plugin.dll" --out "match-snapshot-2.json"
+fm-match-sim diff-match-snapshots --first "match-snapshot-1.json" --second "match-snapshot-2.json" --out "match-diff.json"
+```
+
+The resulting `candidates_with_changes` and per-address
+`changed_fields` let us identify whether particular match-object
+candidates appear to change during the match. Treat these as **unverified fields**:
+a changing clock-like number does not prove it represents a match clock, and a
+matching vtable does not prove an active match. Do not restart the game between
+snapshots, as the old addresses would be invalid. The command never invokes
+game functions, injects code or writes to game memory.
+
 ### 4. Plan a paired A/B experiment
 
 ```powershell
@@ -132,7 +161,7 @@ fm-match-sim verify-repeat --first repeat-1.csv --second repeat-2.csv
 
 ## Roadmap and evidence gates
 
-1. **Done:** Read-only PE build inspection, read-only live signature probe, bounded candidate-object scan, experiment planning, paired-data analysis, reproducibility checks, unit tests.
+1. **Done:** Read-only PE build inspection, read-only live signature probe, bounded candidate-object scan, read-only candidate snapshots, experiment planning, paired-data analysis, reproducibility checks, unit tests.
 2. **Open:** Establish an authorized, stable, initialized FM27 engine host and correct stream/ABI ownership.
 3. **Open:** Validate one full match with final score/statistics, no crash, correct cleanup.
 4. **Open:** Identical fixture + same seed twice, plus replay after a different seed to detect global-state contamination.
