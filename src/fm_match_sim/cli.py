@@ -14,6 +14,7 @@ from .memory_map import map_live_memory
 from .pe import inspect
 from .seeds import parse_seeds, write_plan
 from .score_probe import analyze_score_change, capture_live_score_data
+from .score_sequence import analyze_score_sequence
 from .snapshots import diff_snapshots, snapshot_live
 
 
@@ -96,6 +97,12 @@ def build_parser() -> argparse.ArgumentParser:
     score_analysis.add_argument("--after", required=True)
     score_analysis.add_argument("--out", help="optional small JSON report")
 
+    sequence = sub.add_parser("analyze-score-sequence",
+        help="offline score-field candidates across three or more snapshots")
+    sequence.add_argument("--captures", required=True, nargs="+",
+                          help="ordered local capture JSON files (3-12)")
+    sequence.add_argument("--out", help="optional small JSON report")
+
     plan = sub.add_parser("plan", help="create A/B paired-seed execution plan; does not simulate")
     plan.add_argument("--fixture-id", required=True, help="stable identifier for one controlled fixture")
     plan.add_argument("--tactic-a", required=True, help="original FMF file")
@@ -158,6 +165,12 @@ def main(argv: list[str] | None = None) -> int:
             before = json.loads(Path(args.before).read_text(encoding="utf-8-sig"))
             after = json.loads(Path(args.after).read_text(encoding="utf-8-sig"))
             _emit(analyze_score_change(before, after), args.out)
+        elif args.command == "analyze-score-sequence":
+            captures = [
+                json.loads(Path(path).read_text(encoding="utf-8-sig"))
+                for path in args.captures
+            ]
+            _emit(analyze_score_sequence(captures), args.out)
         elif args.command == "plan":
             seeds = parse_seeds(args.seeds)
             runs = write_plan(
