@@ -13,6 +13,7 @@ from .match_objects import scan_live_matches
 from .memory_map import map_live_memory
 from .pe import inspect
 from .seeds import parse_seeds, write_plan
+from .score_probe import analyze_score_change, capture_live_score_data
 from .snapshots import diff_snapshots, snapshot_live
 
 
@@ -77,6 +78,24 @@ def build_parser() -> argparse.ArgumentParser:
     diff.add_argument("--second", required=True, help="JSON snapshot after")
     diff.add_argument("--out", help="optional diff JSON path")
 
+    score = sub.add_parser("capture-score-data",
+        help="bounded read-only capture of candidate match/team memory windows")
+    score.add_argument("--from-scan", required=True, help="JSON from scan-live-matches")
+    score.add_argument("--dll", required=True, help="path to installed game_plugin.dll")
+    score.add_argument("--home", type=int, required=True, help="visible home goals")
+    score.add_argument("--away", type=int, required=True, help="visible away goals")
+    score.add_argument("--tag", required=True, help="label e.g. baseline or first_goal")
+    score.add_argument("--include-idle", action="store_true",
+                       help="include clock=0 match candidates")
+    score.add_argument("--out", required=True,
+                       help="private capture JSON; keep within ignored captures/ folder")
+
+    score_analysis = sub.add_parser("analyze-score-change",
+        help="offline possible integer score fields from two manual-score captures")
+    score_analysis.add_argument("--before", required=True)
+    score_analysis.add_argument("--after", required=True)
+    score_analysis.add_argument("--out", help="optional small JSON report")
+
     plan = sub.add_parser("plan", help="create A/B paired-seed execution plan; does not simulate")
     plan.add_argument("--fixture-id", required=True, help="stable identifier for one controlled fixture")
     plan.add_argument("--tactic-a", required=True, help="original FMF file")
@@ -120,6 +139,25 @@ def main(argv: list[str] | None = None) -> int:
             before = json.loads(Path(args.first).read_text(encoding="utf-8-sig"))
             after = json.loads(Path(args.second).read_text(encoding="utf-8-sig"))
             _emit(diff_snapshots(before, after), args.out)
+        elif args.command == "capture-score-data":
+            data = capture_live_score_data(Path(args.dll), Path(args.from_scan),
+                                           home_goals=args.home, away_goals=args.away,
+                                           tag=args.tag, include_idle=args.include_idle)
+            path = Path(args.out)
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+            _emit({"written": str(path), "tag": args.tag,
+                   "visible_score": data["visible_score"],
+                   "captured_objects": len(data["matches"]),
+                   "captured_windows": sum(
+                       sum("data" in window for window in item["windows"].values())
+                       for item in data["matches"]),
+                   "read_only": True,
+                   "warning": "This file includes raw game process memory. Keep it private."})
+        elif args.command == "analyze-score-change":
+            before = json.loads(Path(args.before).read_text(encoding="utf-8-sig"))
+            after = json.loads(Path(args.after).read_text(encoding="utf-8-sig"))
+            _emit(analyze_score_change(before, after), args.out)
         elif args.command == "plan":
             seeds = parse_seeds(args.seeds)
             runs = write_plan(
