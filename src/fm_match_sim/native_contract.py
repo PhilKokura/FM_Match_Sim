@@ -83,6 +83,35 @@ def audit_native_contract(report: dict) -> dict:
                 "argument_count": call.get("argument_count"),
                 "pcode_arguments": call.get("pcode_arguments"),
             })
+    # Direct cross-reference intersection: one FM27 native function calls
+    # both the fixture constructor and the native simulation runner.
+    # This is an orchestration research lead, NOT a validated one-call API.
+    def referrers(target_name: str) -> dict[str, list[str]]:
+        found: dict[str, list[str]] = {}
+        for ref in functions.get(target_name, {}).get("incoming", []):
+            caller = ref.get("caller") or {}
+            entry = caller.get("entry_rva")
+            site = ref.get("callsite_rva")
+            if entry and site:
+                found.setdefault(entry, []).append(site)
+        return found
+
+    factory_referrers = referrers("fixture_factory")
+    play_referrers = referrers("play_to_end")
+    shared_fixture_play_callers = [
+        {
+            "caller_rva": address,
+            "factory_call_sites": factory_referrers[address],
+            "play_call_sites": play_referrers[address],
+            "decompiled_in_export": bool(
+                functions.get("fixture_play_candidate", {}).get("function", {}).get("entry_rva")
+                == address
+                and functions.get("fixture_play_candidate", {}).get("decompilation", {}).get("status")
+                == "decompiled"
+            ),
+        }
+        for address in sorted(set(factory_referrers) & set(play_referrers))
+    ]
     matched = sum(edge["observed_direct"] for edge in edges)
     return {
         "build_hash_verified": report.get("ghidra_executable_sha256") == KNOWN_SHA256,
@@ -90,6 +119,7 @@ def audit_native_contract(report: dict) -> dict:
         "direct_lifecycle_edges_observed": matched,
         "direct_lifecycle_edges_checked": len(edges),
         "edges": edges,
+        "shared_fixture_play_callers": shared_fixture_play_callers,
         "ordinary_caller_to_play_high_pcode": mode1_calls[:8],
         "native_execution_ready": False,
         "unresolved_blockers": [
