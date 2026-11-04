@@ -10,6 +10,7 @@ import sys
 from .benchmark import compare, read_results, verify_repeat
 from .live import probe_live
 from .match_objects import scan_live_matches
+from .memory_map import map_live_memory
 from .pe import inspect
 from .seeds import parse_seeds, write_plan
 
@@ -41,6 +42,15 @@ def build_parser() -> argparse.ArgumentParser:
                       help="loaded game_plugin.dll module base, e.g. 0x7FFF7E230000")
     live.add_argument("--dll", required=True, help="path to the installed DLL")
     live.add_argument("--out", help="optional JSON output path")
+
+    memory_map = sub.add_parser("map-live",
+        help="read-only inventory of process memory regions (no memory-content scanning)")
+    memory_map.add_argument("--pid", type=int, required=True)
+    memory_map.add_argument("--base", type=lambda raw: int(raw, 0), required=True)
+    memory_map.add_argument("--dll", required=True)
+    memory_map.add_argument("--top", type=int, default=12,
+                            help="number of largest readable private regions, 1-30")
+    memory_map.add_argument("--out", help="optional JSON output path")
 
     scan = sub.add_parser("scan-live-matches",
                           help="bounded read-only scan for candidate GAME_MATCH objects (Windows)")
@@ -80,6 +90,9 @@ def main(argv: list[str] | None = None) -> int:
             report = probe_live(Path(args.dll), pid=args.pid, module_base=args.base)
             _emit(report, args.out)
             return 0 if report["all_signatures_match"] else 1
+        elif args.command == "map-live":
+            _emit(map_live_memory(Path(args.dll), pid=args.pid,
+                                  module_base=args.base, top=args.top), args.out)
         elif args.command == "scan-live-matches":
             _emit(scan_live_matches(Path(args.dll), pid=args.pid,
                                     module_base=args.base,
