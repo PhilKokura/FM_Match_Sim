@@ -8,6 +8,7 @@ from pathlib import Path
 import sys
 
 from .benchmark import compare, read_results, verify_repeat
+from .live import probe_live
 from .pe import inspect
 from .seeds import parse_seeds, write_plan
 
@@ -33,6 +34,13 @@ def build_parser() -> argparse.ArgumentParser:
     pe.add_argument("--no-hash", action="store_true", help="skip SHA-256 of the large binary")
     pe.add_argument("--out", help="optional JSON output path")
 
+    live = sub.add_parser("probe-live", help="read-only runtime signature check (Windows)")
+    live.add_argument("--pid", type=int, required=True, help="PID of the running fm.exe")
+    live.add_argument("--base", type=lambda raw: int(raw, 0), required=True,
+                      help="loaded game_plugin.dll module base, e.g. 0x7FFF7E230000")
+    live.add_argument("--dll", required=True, help="path to the installed DLL")
+    live.add_argument("--out", help="optional JSON output path")
+
     plan = sub.add_parser("plan", help="create A/B paired-seed execution plan; does not simulate")
     plan.add_argument("--fixture-id", required=True, help="stable identifier for one controlled fixture")
     plan.add_argument("--tactic-a", required=True, help="original FMF file")
@@ -57,6 +65,10 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if args.command == "inspect":
             _emit(inspect(Path(args.dll), hash_file=not args.no_hash), args.out)
+        elif args.command == "probe-live":
+            report = probe_live(Path(args.dll), pid=args.pid, module_base=args.base)
+            _emit(report, args.out)
+            return 0 if report["all_signatures_match"] else 1
         elif args.command == "plan":
             seeds = parse_seeds(args.seeds)
             runs = write_plan(
