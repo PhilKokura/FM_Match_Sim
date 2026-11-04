@@ -80,6 +80,26 @@ class NativeContractTests(unittest.TestCase):
         self.assertEqual(audit["direct_lifecycle_edges_observed"], 0)
         self.assertFalse(audit["native_execution_ready"])
 
+    def test_shared_fixture_and_play_caller_detected(self):
+        item = report()
+        entries = {record["name"]: record for record in item["functions"]}
+        entries["fixture_factory"]["incoming"] = [{
+            "caller": {"entry_rva": "0xC2F820"},
+            "callsite_rva": "0xC2F8DC",
+        }]
+        entries["play_to_end"]["incoming"] = [
+            {"caller": {"entry_rva": "0xC2F820"}, "callsite_rva": "0xC2FA42"},
+            {"caller": {"entry_rva": "0xC2F820"}, "callsite_rva": "0xC2FB6E"},
+        ]
+        audit = audit_native_contract(item)
+        self.assertEqual(audit["shared_fixture_play_callers"], [{
+            "caller_rva": "0xC2F820",
+            "factory_call_sites": ["0xC2F8DC"],
+            "play_call_sites": ["0xC2FA42", "0xC2FB6E"],
+            "decompiled_in_export": False,
+        }])
+        self.assertFalse(audit["native_execution_ready"])
+
     def test_rejects_wrong_hash_or_executed_code(self):
         item = report()
         item["ghidra_executable_sha256"] = "bad"
