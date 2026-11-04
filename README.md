@@ -137,6 +137,34 @@ matching vtable does not prove an active match. Do not restart the game between
 snapshots, as the old addresses would be invalid. The command never invokes
 game functions, injects code or writes to game memory.
 
+
+### Multi-snapshot score hypothesis analysis (no game process required)
+
+When a sequence of captures exists, including the 2026-11-04 Champions
+League final with a provisional offside goal, run this **offline** command
+from the repo working directory:
+
+```powershell
+git pull
+
+fm-match-sim analyze-score-sequence `
+  --captures captures/before.json captures/score-0-1.json captures/provisional-1-1.json captures/disallowed-0-1.json captures/final.json `
+  --out captures/score-sequence-analysis.json
+```
+
+The command loads 3-12 capture JSON files in chronological order. The
+files must come from the same FM27 process/build. It uses only match objects
+that appear in *all* captures and have stable team pointers. It compares
+32-bit aligned integers across every saved window with both independently
+entered visible score series. The output lists candidate offsets and the
+trace for the previously researched `match_tail + 0x12BA0` field.
+
+**Limitation:** Identical values across five captures can be coincidences or
+correlated match-event counters. A candidate is NOT a validated engine score
+field until cross-match goal events, control observations, and native
+reverse-reference analysis establish its actual meaning. The CLI prints
+only offsets/value traces, not raw memory; the input files remain local.
+
 ### Read-only score-field discovery (next experiment)
 
 The match-end test from 2026-11-04 showed that match objects are recycled
