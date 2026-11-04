@@ -1,6 +1,5 @@
 """Static proof obligations for the native FM27 engine inspection stage."""
 
-import ast
 import json
 from pathlib import Path
 import tempfile
@@ -102,11 +101,12 @@ class NativeContractTests(unittest.TestCase):
             output = json.loads(target.read_text(encoding="utf-8"))
             self.assertEqual(output["direct_lifecycle_edges_observed"], len(RESEARCH_EDGES))
 
-    def test_ghidra_script_is_valid_python_syntax_and_read_only(self):
+    def test_ghidra_java_script_is_read_only(self):
         script = (Path(__file__).resolve().parents[1] /
-                  "ghidra_scripts" / "Fm27MatchCallgraph.py")
+                  "ghidra_scripts" / "Fm27MatchCallgraph.java")
         contents = script.read_text(encoding="utf-8")
-        ast.parse(contents, filename=str(script))
+        self.assertIn("extends GhidraScript", contents)
+        self.assertIn("public void run()", contents)
         self.assertIn("getScriptArgs()", contents)
         self.assertIn("getExecutableSHA256()", contents)
         self.assertNotIn("WriteProcessMemory", contents)
