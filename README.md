@@ -19,7 +19,7 @@ python -m unittest discover -s tests -v
 ### 1. Check the installed FM27 binary
 
 ```powershell
-fm-match-sim inspect --dll "D:\\Steam\\steamapps\\common\\Football Manager 27\\fm_Data\\Plugins\\x86_64\\game_plugin.dll" --out dll-inspection.json
+fm-match-sim inspect --dll "D:\Steam\steamapps\common\Football Manager 27\fm_Data\Plugins\x86_64\game_plugin.dll" --out dll-inspection.json
 ```
 
 This inspects the PE headers and compares its SHA-256 with **one specific research build** documented on 2026-11-04. The listed RVAs are *research leads*, not a functioning callable interface. A different hash requires revalidation. The game need not be running. No binary changes occur.
@@ -30,7 +30,7 @@ This inspects the PE headers and compares its SHA-256 with **one specific resear
 fm-match-sim plan --fixture-id "test-fixture-001" --tactic-a "original.fmf" --tactic-b "variant.fmf" --seeds "1-500" --out plan.csv
 ```
 
-Produces **1,000 planned runs**, two per seed. This command only generates a plan and hashes the input tactic files. It **does not execute matches**. Identical FMF contents are rejected.
+Produces **1,000 planned runs**, two per seed. This command only generates a plan and hashes the input tactic files. It **does not execute matches**. Identical FMF file contents are rejected, but **different hashes do not prove different tactics**: separate exports of the same FM27 tactic may have randomized encrypted bytes. These hashes are for file provenance only; semantic comparison requires decoded tactic content.
 
 ### 3. Analyze completed external experiment results
 

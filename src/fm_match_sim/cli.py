@@ -63,7 +63,8 @@ def main(argv: list[str] | None = None) -> int:
                 Path(args.out), args.fixture_id, Path(args.tactic_a), Path(args.tactic_b), seeds
             )
             _emit({"plan": args.out, "paired_seeds": len(seeds), "planned_runs": runs,
-                   "status": "not executed; requires a separately validated FM27 engine adapter"})
+                   "status": "not executed; requires a separately validated FM27 engine adapter",
+                   "warning": "different FMF file hashes do not prove different tactic settings"})
         elif args.command == "compare":
             _emit(compare(read_results(Path(args.original)), read_results(Path(args.variant))), args.out)
         elif args.command == "verify-repeat":
