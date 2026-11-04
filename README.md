@@ -137,6 +137,60 @@ matching vtable does not prove an active match. Do not restart the game between
 snapshots, as the old addresses would be invalid. The command never invokes
 game functions, injects code or writes to game memory.
 
+### Read-only score-field discovery (next experiment)
+
+The match-end test from 2026-11-04 showed that match objects are recycled
+immediately after leaving the match UI. **The finished 1:0 Pokal match cannot
+be read retrospectively using the old seven addresses.** Capture a *new test
+match* while paused, ideally with a test save. Do not use a meaningful career
+save for experimental engine work.
+
+1. Start a new match. Pause around minute 2 or 3, while the displayed score is
+   still 0:0. Keep FM27 running.
+2. If this is the same FM27 process as the earlier test, first try the saved
+   list of candidate addresses. It may work if the game has reused allocations,
+   but it is **not guaranteed**. If the capture reports 0 objects, regenerate
+   the match-object scan (after confirming the current PID and DLL base).
+
+```powershell
+git pull
+$dll = "D:\Steam\steamapps\common\Football Manager 27\fm_Data\Plugins\x86_64\game_plugin.dll"
+
+fm-match-sim capture-score-data --from-scan match-objects-remainder.json --dll $dll --home 0 --away 0 --tag before_goal --out captures/before.json
+```
+
+If no matching active objects are captured, use the current process PID/base:
+
+```powershell
+fm-match-sim scan-live-matches --pid 7004 --base 0x7FFF7E230000 --dll $dll --scan-mib 8192 --max-seconds 180 --out captures/current-match-scan.json
+fm-match-sim capture-score-data --from-scan captures/current-match-scan.json --dll $dll --home 0 --away 0 --tag before_goal --out captures/before.json
+```
+
+3. Continue the **same** match to its first goal; pause while the changed score
+   is displayed. Substitute the *actual* home and away scores:
+
+```powershell
+fm-match-sim capture-score-data --from-scan captures/current-match-scan.json --dll $dll --home 1 --away 0 --tag first_goal --out captures/after.json
+fm-match-sim analyze-score-change --before captures/before.json --after captures/after.json --out captures/score-hypotheses.json
+```
+
+If your first capture used the **old** scan file successfully, use that same
+`match-objects-remainder.json` as `--from-scan` for the second capture as
+well. Do not compare across different matches or a process restart.
+
+The capture reads at most 8 KiB of each candidate match header, a bounded
+window near the known match-state fields, and 8 KiB from each candidate team
+pointer. Output is compressed, timestamped and saved **only to your local
+captures/ directory**, which is gitignored. The CLI prints only a short status
+summary, not the raw bytes. **Do not commit or upload raw capture JSON** as it
+may contain unrelated game data. The analyzer searches for integer transitions
+consistent with the displayed score. False positives are expected: an integer
+that changes from 0 to 1 could be anything. It is not a score field until
+Ghidra dataflow/xrefs and independent goal events validate it.
+
+No native function is called, no memory is modified, and there is still no
+automated FM27 match runner.
+
 ### 4. Plan a paired A/B experiment
 
 ```powershell
@@ -161,7 +215,7 @@ fm-match-sim verify-repeat --first repeat-1.csv --second repeat-2.csv
 
 ## Roadmap and evidence gates
 
-1. **Done:** Read-only PE build inspection, read-only live signature probe, bounded candidate-object scan, read-only candidate snapshots, experiment planning, paired-data analysis, reproducibility checks, unit tests.
+1. **Done:** Read-only PE build inspection, read-only live signature probe, bounded candidate-object scan, read-only candidate snapshots, score-hypothesis capture/analysis, experiment planning, paired-data analysis, reproducibility checks, unit tests.
 2. **Open:** Establish an authorized, stable, initialized FM27 engine host and correct stream/ABI ownership.
 3. **Open:** Validate one full match with final score/statistics, no crash, correct cleanup.
 4. **Open:** Identical fixture + same seed twice, plus replay after a different seed to detect global-state contamination.
