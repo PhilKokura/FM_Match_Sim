@@ -58,7 +58,9 @@ def build_parser() -> argparse.ArgumentParser:
     scan.add_argument("--base", type=lambda raw: int(raw, 0), required=True)
     scan.add_argument("--dll", required=True)
     scan.add_argument("--scan-mib", type=int, default=512,
-                      help="maximum private memory attempted, 1-2048 MiB (default: 512)")
+                      help="maximum private memory attempted, 1-8192 MiB (default: 512)")
+    scan.add_argument("--skip-mib", type=int, default=0,
+                      help="eligible private memory to skip before scanning, 0-8192 MiB")
     scan.add_argument("--max-seconds", type=int, default=25)
     scan.add_argument("--out", help="optional JSON output path")
 
@@ -97,7 +99,8 @@ def main(argv: list[str] | None = None) -> int:
             _emit(scan_live_matches(Path(args.dll), pid=args.pid,
                                     module_base=args.base,
                                     max_scan_mib=args.scan_mib,
-                                    max_seconds=args.max_seconds), args.out)
+                                    max_seconds=args.max_seconds,
+                                    skip_mib=args.skip_mib), args.out)
         elif args.command == "plan":
             seeds = parse_seeds(args.seeds)
             runs = write_plan(
