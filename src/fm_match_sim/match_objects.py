@@ -89,18 +89,21 @@ def scan_bytes(data: bytes, needle: bytes, base: int) -> list[int]:
 def scan_live_matches(
     dll: Path, *, pid: int, module_base: int,
     max_scan_mib: int = 512, max_hits: int = 12, max_seconds: int = 25,
+    skip_mib: int = 0,
 ) -> dict:
     """Only inspect committed private memory; stop on strict data/time/hit limits."""
     if sys.platform != "win32":
         raise OSError("scan-live-matches runs only on Windows")
     if ctypes.sizeof(ctypes.c_void_p) != 8:
         raise ValueError("scan-live-matches requires 64-bit Python")
-    if not (1 <= max_scan_mib <= 2048):
-        raise ValueError("scan budget must be between 1 and 2048 MiB")
+    if not (1 <= max_scan_mib <= 8192):
+        raise ValueError("scan budget must be between 1 and 8192 MiB")
+    if not (0 <= skip_mib <= 8192):
+        raise ValueError("skip budget must be between 0 and 8192 MiB")
     if not (1 <= max_hits <= 64):
         raise ValueError("max_hits must be between 1 and 64")
-    if not (1 <= max_seconds <= 60):
-        raise ValueError("max_seconds must be between 1 and 60")
+    if not (1 <= max_seconds <= 180):
+        raise ValueError("max_seconds must be between 1 and 180")
 
     # Confirm the exact build and live entrypoint signatures before reading heap memory.
     provenance = probe_live(dll, pid=pid, module_base=module_base)
@@ -133,7 +136,10 @@ def scan_live_matches(
     hits: list[str] = []
     errors = 0
     regions_considered = 0
+    regions_read = 0
     scanned = 0
+    skipped = 0
+    skip_left = skip_mib * 1024 * 1024
     maximum = max_scan_mib * 1024 * 1024
     deadline = time.monotonic() + max_seconds
     reason = "address space fully enumerated"
@@ -146,12 +152,20 @@ def scan_live_matches(
             if not _eligible(state, protect, memory_type):
                 continue
             regions_considered += 1
+            # Skip only readable committed private bytes, exactly as the previous
+            # scan counted them. This avoids repeating its first 2 GiB.
+            region_skip = min(skip_left, region_size)
+            skip_left -= region_skip
+            skipped += region_skip
+            if region_skip == region_size:
+                continue
             remaining = maximum - scanned
             if remaining <= 0:
                 reason = "byte budget reached"
                 break
-            limit = min(region_size, remaining)
-            position = 0
+            limit = region_skip + min(region_size - region_skip, remaining)
+            position = region_skip
+            regions_read += 1
             previous = b""
             while position < limit:
                 if time.monotonic() >= deadline:
@@ -186,6 +200,9 @@ def scan_live_matches(
     finally:
         kernel32.CloseHandle(handle)
 
+    if skip_left and reason == "address space fully enumerated":
+        reason = "skip exceeds eligible private memory"
+
     return {
         "pid": pid,
         "module_base": f"0x{module_base:X}",
@@ -194,13 +211,18 @@ def scan_live_matches(
         "candidate_object_addresses": hits,
         "candidate_count": len(hits),
         "bytes_attempted": scanned,
+        "bytes_skipped": skipped,
+        "requested_skip_mib": skip_mib,
+        "requested_scan_mib": max_scan_mib,
         "private_regions_considered": regions_considered,
+        "private_regions_read": regions_read,
         "read_failures": errors,
         "stop_reason": reason,
         "read_only": True,
         "caveat": (
             "Candidates are raw vtable-pointer matches only; they could be stale objects, "
-            "unrelated memory, or inactive allocations. Zero candidates does not mean "
-            "that the engine cannot simulate matches. No object is dereferenced here."
+            "unrelated memory, or inactive allocations. A negative result is limited to "
+            "the scanned memory and time window, and does not prove the object is absent. "
+            "No object is dereferenced here."
         ),
     }
