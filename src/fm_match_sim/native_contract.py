@@ -98,16 +98,16 @@ def audit_native_contract(report: dict) -> dict:
 
     factory_referrers = referrers("fixture_factory")
     play_referrers = referrers("play_to_end")
+    orchestration = functions.get("fixture_play_candidate") or {}
+    orchestration_fn = orchestration.get("function") or {}
     shared_fixture_play_callers = [
         {
             "caller_rva": address,
             "factory_call_sites": factory_referrers[address],
             "play_call_sites": play_referrers[address],
             "decompiled_in_export": bool(
-                functions.get("fixture_play_candidate", {}).get("function", {}).get("entry_rva")
-                == address
-                and functions.get("fixture_play_candidate", {}).get("decompilation", {}).get("status")
-                == "decompiled"
+                orchestration_fn.get("entry_rva") == address
+                and orchestration.get("decompilation", {}).get("status") == "decompiled"
             ),
         }
         for address in sorted(set(factory_referrers) & set(play_referrers))
