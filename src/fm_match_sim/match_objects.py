@@ -86,6 +86,15 @@ def scan_bytes(data: bytes, needle: bytes, base: int) -> list[int]:
     return hits
 
 
+def _region_window(region_size: int, skip_left: int, budget_left: int) -> tuple[int, int]:
+    """How many eligible bytes to skip and then inspect within one region."""
+    if min(region_size, skip_left, budget_left) < 0:
+        raise ValueError("region size, skip and budget must not be negative")
+    skip = min(skip_left, region_size)
+    take = min(region_size - skip, budget_left)
+    return skip, take
+
+
 def scan_live_matches(
     dll: Path, *, pid: int, module_base: int,
     max_scan_mib: int = 512, max_hits: int = 12, max_seconds: int = 25,
@@ -154,16 +163,17 @@ def scan_live_matches(
             regions_considered += 1
             # Skip only readable committed private bytes, exactly as the previous
             # scan counted them. This avoids repeating its first 2 GiB.
-            region_skip = min(skip_left, region_size)
+            region_skip, region_read = _region_window(
+                region_size, skip_left, maximum - scanned
+            )
             skip_left -= region_skip
             skipped += region_skip
             if region_skip == region_size:
                 continue
-            remaining = maximum - scanned
-            if remaining <= 0:
+            if region_read <= 0:
                 reason = "byte budget reached"
                 break
-            limit = region_skip + min(region_size - region_skip, remaining)
+            limit = region_skip + region_read
             position = region_skip
             regions_read += 1
             previous = b""
