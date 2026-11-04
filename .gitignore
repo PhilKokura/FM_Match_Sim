@@ -11,3 +11,7 @@ dist/
 *.csv
 !.github/
 !examples/*.csv
+
+# Local process-memory captures can contain private game/session data.
+captures/
+research_output/
