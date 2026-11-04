@@ -81,6 +81,24 @@ distribution before trying larger scans:
 fm-match-sim map-live --pid 7004 --base 0x7FFF7E230000 --dll "D:\Steam\steamapps\common\Football Manager 27\fm_Data\Plugins\x86_64\game_plugin.dll" --out memory-map.json
 ```
 
+Our 2026-11-04 live FM27 inventory measured 7,954 MiB of readable
+private memory. The first 2,048 MiB were already scanned while a match was
+running. One bounded follow-up can now skip exactly that prefix of eligible
+private memory and scan the remainder, without repeating it:
+
+```powershell
+fm-match-sim scan-live-matches --pid 7004 --base 0x7FFF7E230000 --dll "D:\Steam\steamapps\common\Football Manager 27\fm_Data\Plugins\x86_64\game_plugin.dll" --skip-mib 2048 --scan-mib 6144 --max-seconds 120 --out match-objects-remainder.json
+```
+
+Keep the same running process and ideally keep the match paused. `skip-mib` counts
+eligible private bytes in ascending address order, not absolute virtual-address
+bytes, and restarts counting from the beginning on every invocation. The
+remaining memory is about 5,906 MiB; the 6,144-MiB budget is intentional.
+Stop if you get a mismatch or read error; a negative result is not proof the
+object is absent, since object lifetimes and vtable hypotheses remain unverified.
+This should be the final broad pointer scan before switching to static
+caller/lifetime analysis.
+
 This command queries **region metadata only** through Windows VirtualQueryEx.
 It neither scans memory contents nor loads or calls native match functions.
 Check `readable_committed_private_mib`,
