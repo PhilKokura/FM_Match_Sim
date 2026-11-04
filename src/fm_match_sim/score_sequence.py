@@ -7,8 +7,6 @@ integer is a real score field, nor identify a native callable game API.
 
 from __future__ import annotations
 
-from collections import Counter
-
 from .score_probe import MAX_SCORE, _unpack
 
 WINDOW_OFFSETS = {
