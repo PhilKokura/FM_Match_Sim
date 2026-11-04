@@ -11,6 +11,7 @@ from .benchmark import compare, read_results, verify_repeat
 from .live import probe_live
 from .match_objects import scan_live_matches
 from .memory_map import map_live_memory
+from .native_contract import audit_native_contract
 from .pe import inspect
 from .seeds import parse_seeds, write_plan
 from .score_probe import analyze_score_change, capture_live_score_data
@@ -103,6 +104,11 @@ def build_parser() -> argparse.ArgumentParser:
                           help="ordered local capture JSON files (3-12)")
     sequence.add_argument("--out", help="optional small JSON report")
 
+    native = sub.add_parser("audit-native-contract",
+        help="offline gate audit for read-only Ghidra match-engine callgraph JSON")
+    native.add_argument("--report", required=True, help="private Ghidra callgraph JSON")
+    native.add_argument("--out", help="optional small audit JSON")
+
     plan = sub.add_parser("plan", help="create A/B paired-seed execution plan; does not simulate")
     plan.add_argument("--fixture-id", required=True, help="stable identifier for one controlled fixture")
     plan.add_argument("--tactic-a", required=True, help="original FMF file")
@@ -171,6 +177,9 @@ def main(argv: list[str] | None = None) -> int:
                 for path in args.captures
             ]
             _emit(analyze_score_sequence(captures), args.out)
+        elif args.command == "audit-native-contract":
+            report = json.loads(Path(args.report).read_text(encoding="utf-8-sig"))
+            _emit(audit_native_contract(report), args.out)
         elif args.command == "plan":
             seeds = parse_seeds(args.seeds)
             runs = write_plan(
