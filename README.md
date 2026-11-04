@@ -23,7 +23,8 @@ game memory, inject code or call the native engine.
    \`252ff8fb5b7a4a5a5464db6ba632e309eef9b6e65ffa992ae20575a189e66c6a\`.
 2. In Ghidra **Window → Script Manager**, add the directory
    \`D:\dev\Homepage\FM_Match_Sim\ghidra_scripts\` using the Script Manager
-   directory picker. Run **Fm27MatchCallgraph.py**. Save the prompted JSON to
+   directory picker. Refresh the script list, then run **Fm27MatchCallgraph.java**
+   (the Java file, not a Python script). Save the prompted JSON to
    \`D:\dev\Homepage\FM_Match_Sim\research_output\fm27-native-callgraph.json\`.
 3. Inspect the short lifecycle audit outside Ghidra:
 
@@ -44,7 +45,7 @@ kept private.
 
 Optional for an existing Ghidra project: use \`analyzeHeadless.bat\` with
 \`-process game_plugin.dll -readOnly -noanalysis\`, \`-scriptPath\` pointing to
-\`ghidra_scripts\`, and \`-postScript Fm27MatchCallgraph.py <output.json>\`.
+\`ghidra_scripts\`, and \`-postScript Fm27MatchCallgraph.java <output.json>\`.
 Use the **existing project location and name** from your Ghidra environment;
 do not create/re-import the 404 MB DLL unnecessarily. See Ghidra's official
 analyzeHeadless documentation for its argument order.
