@@ -43,6 +43,7 @@ public class Fm27MatchCallgraph extends GhidraScript {
 
     // RVAs, not absolute virtual addresses; exact known FM27 DLL build only.
     private static final String[][] TARGETS = {
+        {"fixture_play_candidate", "C2F820"},
         {"fixture_factory", "C33370"},
         {"fixture_prep_helper", "C2EAF0"},
         {"match_allocator", "A85270"},
@@ -64,7 +65,7 @@ public class Fm27MatchCallgraph extends GhidraScript {
 
     // Decompile only the paths relevant to the first hosted-match experiment.
     private static final Set<String> DECOMPILE_TARGETS = new LinkedHashSet<String>(
-        Arrays.asList("fixture_factory", "match_builder", "builder_args",
+        Arrays.asList("fixture_play_candidate", "fixture_factory", "match_builder", "builder_args",
                       "prepare_candidate", "ordinary_run_caller", "play_to_end",
                       "match_reader"));
 
