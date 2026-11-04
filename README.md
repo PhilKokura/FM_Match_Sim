@@ -52,7 +52,25 @@ It does not inject code, run engine functions, alter memory or access savegame
 data. Matching entrypoint bytes are **not** a functioning engine interface.
 If permission is denied, stop; do not bypass game or operating-system protections.
 
-### 3. Plan a paired A/B experiment
+### 3. Look for candidate match objects (bounded, read-only)
+
+This optional diagnostic scans a maximum of 512 MiB of readable committed
+**private** process memory, looking for 8-byte pointers to the known
+GAME_MATCH vtable for the exact verified build. It reads no objects behind
+those pointers. A match object may not exist before the match starts.
+
+```powershell
+fm-match-sim scan-live-matches --pid 7004 --base 0x7FFF7E230000 --dll "D:\Steam\steamapps\common\Football Manager 27\fm_Data\Plugins\x86_64\game_plugin.dll" --scan-mib 512 --max-seconds 25 --out match-objects.json
+```
+
+PID and base can change after an FM27 restart. The command validates the
+known DLL hash and all five loaded function signatures before scanning.
+It opens the process with read/query rights only. Scanning can finish without
+finding a candidate, and budget/time limits mean it does not cover the entire
+address space. A matching pointer could reference stale or unrelated data.
+**This does not execute a match or prove that a candidate is valid.**
+
+### 4. Plan a paired A/B experiment
 
 ```powershell
 fm-match-sim plan --fixture-id "test-fixture-001" --tactic-a "original.fmf" --tactic-b "variant.fmf" --seeds "1-500" --out plan.csv
@@ -60,7 +78,7 @@ fm-match-sim plan --fixture-id "test-fixture-001" --tactic-a "original.fmf" --ta
 
 Produces **1,000 planned runs**, two per seed. This command only generates a plan and hashes the input tactic files. It **does not execute matches**. Identical FMF file contents are rejected, but **different hashes do not prove different tactics**: separate exports of the same FM27 tactic may have randomized encrypted bytes. These hashes are for file provenance only; semantic comparison requires decoded tactic content.
 
-### 4. Analyze completed external experiment results
+### 5. Analyze completed external experiment results
 
 Once a separate real FM27 adapter can produce CSVs with columns `seed,home_goals,away_goals`, plus optional `home_xg,away_xg,finished`:
 
@@ -76,7 +94,7 @@ fm-match-sim verify-repeat --first repeat-1.csv --second repeat-2.csv
 
 ## Roadmap and evidence gates
 
-1. **Done:** Read-only PE build inspection, read-only live signature probe, experiment planning, paired-data analysis, reproducibility checks, unit tests.
+1. **Done:** Read-only PE build inspection, read-only live signature probe, bounded candidate-object scan, experiment planning, paired-data analysis, reproducibility checks, unit tests.
 2. **Open:** Establish an authorized, stable, initialized FM27 engine host and correct stream/ABI ownership.
 3. **Open:** Validate one full match with final score/statistics, no crash, correct cleanup.
 4. **Open:** Identical fixture + same seed twice, plus replay after a different seed to detect global-state contamination.
