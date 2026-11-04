@@ -13,6 +13,7 @@ from .match_objects import scan_live_matches
 from .memory_map import map_live_memory
 from .pe import inspect
 from .seeds import parse_seeds, write_plan
+from .snapshots import diff_snapshots, snapshot_live
 
 
 def _emit(data: dict, out: str | None = None) -> None:
@@ -64,6 +65,18 @@ def build_parser() -> argparse.ArgumentParser:
     scan.add_argument("--max-seconds", type=int, default=25)
     scan.add_argument("--out", help="optional JSON output path")
 
+    snap = sub.add_parser("snapshot-matches",
+                          help="read only selected match-object candidates from scan JSON")
+    snap.add_argument("--from-scan", required=True, help="JSON from scan-live-matches")
+    snap.add_argument("--dll", required=True, help="installed game_plugin.dll")
+    snap.add_argument("--out", required=True, help="JSON snapshot output path")
+
+    diff = sub.add_parser("diff-match-snapshots",
+                          help="compare two offline candidate snapshots")
+    diff.add_argument("--first", required=True, help="JSON snapshot before")
+    diff.add_argument("--second", required=True, help="JSON snapshot after")
+    diff.add_argument("--out", help="optional diff JSON path")
+
     plan = sub.add_parser("plan", help="create A/B paired-seed execution plan; does not simulate")
     plan.add_argument("--fixture-id", required=True, help="stable identifier for one controlled fixture")
     plan.add_argument("--tactic-a", required=True, help="original FMF file")
@@ -101,6 +114,12 @@ def main(argv: list[str] | None = None) -> int:
                                     max_scan_mib=args.scan_mib,
                                     max_seconds=args.max_seconds,
                                     skip_mib=args.skip_mib), args.out)
+        elif args.command == "snapshot-matches":
+            _emit(snapshot_live(Path(args.dll), Path(args.from_scan)), args.out)
+        elif args.command == "diff-match-snapshots":
+            before = json.loads(Path(args.first).read_text(encoding="utf-8-sig"))
+            after = json.loads(Path(args.second).read_text(encoding="utf-8-sig"))
+            _emit(diff_snapshots(before, after), args.out)
         elif args.command == "plan":
             seeds = parse_seeds(args.seeds)
             runs = write_plan(
