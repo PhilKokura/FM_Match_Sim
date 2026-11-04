@@ -70,6 +70,26 @@ finding a candidate, and budget/time limits mean it does not cover the entire
 address space. A matching pointer could reference stale or unrelated data.
 **This does not execute a match or prove that a candidate is valid.**
 
+### Read-only memory map after a zero-candidate scan
+
+The earlier scanner reads **only committed private memory**, in ascending
+virtual-address order. Its 2-GiB ceiling is not an exhaustive heap scan.
+If zero candidates were found while a match was playing, inspect the allocation
+distribution before trying larger scans:
+
+```powershell
+fm-match-sim map-live --pid 7004 --base 0x7FFF7E230000 --dll "D:\Steam\steamapps\common\Football Manager 27\fm_Data\Plugins\x86_64\game_plugin.dll" --out memory-map.json
+```
+
+This command queries **region metadata only** through Windows VirtualQueryEx.
+It neither scans memory contents nor loads or calls native match functions.
+Check `readable_committed_private_mib`,
+`eligible_mib_beyond_first_2gib`, `address_bands_1tib` and
+`largest_readable_private_regions`. Values tell us which accessible
+areas the old search did not cover, **not** whether a valid GAME_MATCH object is
+currently allocated. If the memory layout does not explain the null result,
+investigate the native object's actual lifetime and vtable before scanning again.
+
 ### 4. Plan a paired A/B experiment
 
 ```powershell
