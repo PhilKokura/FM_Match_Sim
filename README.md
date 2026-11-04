@@ -6,6 +6,55 @@
 
 The first milestone provides a version-aware, read-only binary inspection tool and the statistical infrastructure needed once an independently validated match-engine adapter exists.
 
+## Next milestone: validate the native build → prepare → play call chain
+
+The native run-to-end loop has already been identified in the feasibility study.
+**Do not start more manual matches just to find score fields.** The next blocker is
+a validated *initialized host*, fixture ownership and correct call signatures.
+We have not executed any native FM27 simulation yet.
+
+The repository now includes a small **read-only Ghidra script** to inspect the
+known fixture construction, preparation and native run caller functions. It
+queries the already analyzed DLL in Ghidra; it does not attach to FM27, modify
+game memory, inject code or call the native engine.
+
+1. Open your existing **analyzed** FM27 \`game_plugin.dll\` program in Ghidra.
+   Verify the research SHA-256:
+   \`252ff8fb5b7a4a5a5464db6ba632e309eef9b6e65ffa992ae20575a189e66c6a\`.
+2. In Ghidra **Window → Script Manager**, add the directory
+   \`D:\dev\Homepage\FM_Match_Sim\ghidra_scripts\` using the Script Manager
+   directory picker. Run **Fm27MatchCallgraph.py**. Save the prompted JSON to
+   \`D:\dev\Homepage\FM_Match_Sim\research_output\fm27-native-callgraph.json\`.
+3. Inspect the short lifecycle audit outside Ghidra:
+
+\`\`\`powershell
+cd D:\dev\Homepage\FM_Match_Sim
+git pull
+
+fm-match-sim audit-native-contract \`
+  --report research_output\fm27-native-callgraph.json \`
+  --out research_output\fm27-native-audit.json
+\`\`\`
+
+Share the **audit JSON** rather than the complete callgraph: it reports which
+known direct edges Ghidra currently sees, parameter-count hints and unresolved
+runtime prerequisites. Both files stay in the gitignored \`research_output/\`
+folder. The full callgraph contains instruction/decompiler metadata and is best
+kept private.
+
+Optional for an existing Ghidra project: use \`analyzeHeadless.bat\` with
+\`-process game_plugin.dll -readOnly -noanalysis\`, \`-scriptPath\` pointing to
+\`ghidra_scripts\`, and \`-postScript Fm27MatchCallgraph.py <output.json>\`.
+Use the **existing project location and name** from your Ghidra environment;
+do not create/re-import the 404 MB DLL unnecessarily. See Ghidra's official
+analyzeHeadless documentation for its argument order.
+
+**What this does not do:** Passing all static edges cannot validate a callable
+Windows ABI, fixture/team/tactic pointers, the FM27 initialized runtime, or
+clean object destruction. Those gates must be closed before attempting one
+native in-process match on a disposable test save. There is still no working
+automated simulator.
+
 ## Quick start
 
 Python 3.11+, standard library only at runtime:
