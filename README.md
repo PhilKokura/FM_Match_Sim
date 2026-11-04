@@ -24,7 +24,35 @@ fm-match-sim inspect --dll "D:\Steam\steamapps\common\Football Manager 27\fm_Dat
 
 This inspects the PE headers and compares its SHA-256 with **one specific research build** documented on 2026-11-04. The listed RVAs are *research leads*, not a functioning callable interface. A different hash requires revalidation. The game need not be running. No binary changes occur.
 
-### 2. Plan a paired A/B experiment
+### 2. Validate loaded function signatures (Windows, read-only)
+
+With FM27 running, identify the PID and actual ASLR module base in PowerShell:
+
+```powershell
+$p = Get-Process -Name fm -ErrorAction Stop
+$p.Modules | Where-Object ModuleName -eq "game_plugin.dll" | ForEach-Object {
+  [PSCustomObject]@{
+    PID = $p.Id
+    Base = "0x{0:X}" -f $_.BaseAddress.ToInt64()
+    Path = $_.FileName
+  }
+}
+```
+
+Then use the reported values (they can change between runs):
+
+```powershell
+fm-match-sim probe-live --pid 7004 --base 0x7FFF7E230000 --dll "D:\Steam\steamapps\common\Football Manager 27\fm_Data\Plugins\x86_64\game_plugin.dll" --out live-probe.json
+```
+
+The command opens the process with **read-only** rights and reads only the loaded
+PE header and 12 bytes at each of the five documented function RVAs. It
+refuses to proceed if the local DLL hash does not match the researched build.
+It does not inject code, run engine functions, alter memory or access savegame
+data. Matching entrypoint bytes are **not** a functioning engine interface.
+If permission is denied, stop; do not bypass game or operating-system protections.
+
+### 3. Plan a paired A/B experiment
 
 ```powershell
 fm-match-sim plan --fixture-id "test-fixture-001" --tactic-a "original.fmf" --tactic-b "variant.fmf" --seeds "1-500" --out plan.csv
@@ -32,7 +60,7 @@ fm-match-sim plan --fixture-id "test-fixture-001" --tactic-a "original.fmf" --ta
 
 Produces **1,000 planned runs**, two per seed. This command only generates a plan and hashes the input tactic files. It **does not execute matches**. Identical FMF file contents are rejected, but **different hashes do not prove different tactics**: separate exports of the same FM27 tactic may have randomized encrypted bytes. These hashes are for file provenance only; semantic comparison requires decoded tactic content.
 
-### 3. Analyze completed external experiment results
+### 4. Analyze completed external experiment results
 
 Once a separate real FM27 adapter can produce CSVs with columns `seed,home_goals,away_goals`, plus optional `home_xg,away_xg,finished`:
 
@@ -48,7 +76,7 @@ fm-match-sim verify-repeat --first repeat-1.csv --second repeat-2.csv
 
 ## Roadmap and evidence gates
 
-1. **Done:** Read-only PE build inspection, experiment planning, paired-data analysis, reproducibility checks, unit tests.
+1. **Done:** Read-only PE build inspection, read-only live signature probe, experiment planning, paired-data analysis, reproducibility checks, unit tests.
 2. **Open:** Establish an authorized, stable, initialized FM27 engine host and correct stream/ABI ownership.
 3. **Open:** Validate one full match with final score/statistics, no crash, correct cleanup.
 4. **Open:** Identical fixture + same seed twice, plus replay after a different seed to detect global-state contamination.
